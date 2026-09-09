@@ -281,6 +281,164 @@ tryCatch({
   cat("❌ Échec RFI : ", e$message, "\n") 
 })
 
+
+# ==============================================================================
+# RTL (Scraping HTML)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  rtl_web_url <- "https://rtl.fr"
+  rtl_page <- read_html(rtl_web_url)
+  rtl_nodes <- html_nodes(rtl_page, "a")
+  
+  rtl_df <- data.frame(
+    Source = "RTL (FR)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(rtl_nodes, trim = TRUE),
+    URL = html_attr(rtl_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  # Filtrer les liens vides et cibler les articles d'actualité/rubriques
+  rtl_clean <- rtl_df[!is.na(rtl_df$URL) & rtl_df$Title != "", ]
+  rtl_clean <- rtl_clean[grep("^/(actu|culture|sport|style)/", rtl_clean$URL), ]
+  rtl_clean <- unique(rtl_clean)
+  
+  if (nrow(rtl_clean) > 0) {
+    rtl_clean$URL <- paste0("https://rtl.fr", rtl_clean$URL)
+    tous_les_articles <- rbind(tous_les_articles, rtl_clean)
+    cat("✔ RTL : ", nrow(rtl_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ RTL : Aucun article trouvé avec ce filtre.\n")
+  }
+}, error = function(e) { cat("❌ Échec RTL : ", e$message, "\n") })
+
+
+# ==============================================================================
+# France Inter (Scraping HTML)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  inter_web_url <- "https://radiofrance.fr"
+  inter_page <- read_html(inter_web_url)
+  inter_nodes <- html_nodes(inter_page, "a")
+  
+  inter_df <- data.frame(
+    Source = "France Inter (FR)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(inter_nodes, trim = TRUE),
+    URL = html_attr(inter_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  # Filtrer pour garder les articles, podcasts et émissions
+  inter_clean <- inter_df[!is.na(inter_df$URL) & inter_df$Title != "", ]
+  inter_clean <- inter_clean[grep("^/franceinter/(publications|emissions|podcasts)/", inter_clean$URL), ]
+  inter_clean <- unique(inter_clean)
+  
+  if (nrow(inter_clean) > 0) {
+    inter_clean$URL <- paste0("https://radiofrance.fr", inter_clean$URL)
+    tous_les_articles <- rbind(tous_les_articles, inter_clean)
+    cat("✔ France Inter : ", nrow(inter_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ France Inter : Aucun article trouvé avec ce filtre.\n")
+  }
+}, error = function(e) { cat("❌ Échec France Inter : ", e$message, "\n") })
+
+
+# ==============================================================================
+# France Culture (Scraping HTML)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  culture_web_url <- "https://radiofrance.fr"
+  culture_page <- read_html(culture_web_url)
+  culture_nodes <- html_nodes(culture_page, "a")
+  
+  culture_df <- data.frame(
+    Source = "France Culture (FR)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(culture_nodes, trim = TRUE),
+    URL = html_attr(culture_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  culture_clean <- culture_df[!is.na(culture_df$URL) & culture_df$Title != "", ]
+  culture_clean <- culture_clean[grep("^/franceculture/(publications|emissions|podcasts)/", culture_clean$URL), ]
+  culture_clean <- unique(culture_clean)
+  
+  if (nrow(culture_clean) > 0) {
+    culture_clean$URL <- paste0("https://radiofrance.fr", culture_clean$URL)
+    tous_les_articles <- rbind(tous_les_articles, culture_clean)
+    cat("✔ France Culture : ", nrow(culture_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ France Culture : Aucun article trouvé avec ce filtre.\n")
+  }
+}, error = function(e) { cat("❌ Échec France Culture : ", e$message, "\n") })
+
+
+
+# ==============================================================================
+# ARTE (Scraping HTML)
+# ==============================================================================
+# ==============================================================================
+# ARTE (Scraping HTML - Version Corrigée)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  arte_web_url <- "https://www.arte.tv/fr/"
+  arte_page <- read_html(arte_web_url)
+  arte_nodes <- html_nodes(arte_page, "a")
+  
+  # Extraction plus brute pour ne rien rater
+  arte_df <- data.frame(
+    Source = "ARTE (FR)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(arte_nodes, trim = TRUE),
+    URL = html_attr(arte_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  # 1. Nettoyer les lignes sans URL
+  arte_clean <- arte_df[!is.na(arte_df$URL), ]
+  
+  # 2. Filtrer : Accepter les liens relatifs ET absolus vers les vidéos ou articles
+  arte_clean <- arte_clean[grep("^/fr/(videos|articles|guide|videos)/|^https://www.arte.tv/fr/(videos|articles|guide|videos)/", arte_clean$URL), ]
+  
+  # 3. Si le titre a été manqué à cause d'une structure interne (ex: image), 
+  # on extrait une partie de l'URL pour lui donner un nom lisible au lieu de le supprimer
+  idx_titre_vide <- arte_clean$Title == ""
+  if (any(idx_titre_vide)) {
+    # On récupère le dernier segment textuel de l'URL pour combler le vide
+    slugs <- gsub(".*/([^/]+)/$", "\\1", arte_clean$URL[idx_titre_vide])
+    slugs <- gsub("-", " ", slugs) # Remplace les tirets par des espaces
+    arte_clean$Title[idx_titre_vide] <- paste0("[Vidéo/Article] ", tools::toTitleCase(slugs))
+  }
+  
+  # 4. Reconstruire les liens absolus uniquement pour ceux qui sont relatifs
+  if (nrow(arte_clean) > 0) {
+    idx_relative <- !grepl("^http", arte_clean$URL)
+    arte_clean$URL[idx_relative] <- paste0("https://www.arte.tv", arte_clean$URL[idx_relative])
+    
+    # Dédoublonner le résultat final
+    arte_clean <- unique(arte_clean)
+    
+    tous_les_articles <- rbind(tous_les_articles, arte_clean)
+    cat("✔ ARTE : ", nrow(arte_clean), " contenus récupérés.\n")
+  } else {
+    cat("⚠ ARTE : Connexion réussie, mais la structure des liens a changé.\n")
+  }
+}, error = function(e) { cat("❌ Échec ARTE : ", e$message, "\n") })
+
+
 # ==============================================================================
 # 8. TIME MAGAZINE WORLD (Anglais - Scraping Direct Statique Validé)
 # ==============================================================================
@@ -582,8 +740,6 @@ print(head(tous_les_articles, 20))
 table(tous_les_articles$Source)
 
 
-
-
 # ==============================================================================
 # TRAITEMENT FINAL ET EXPORTATION
 # ==============================================================================
@@ -600,3 +756,4 @@ tryCatch({
   write.csv2(tous_les_articles, file = nom_fichier, row.names = FALSE, fileEncoding = "UTF-8")
   cat("\n💾 Fichier enregistré sous :", nom_fichier, "\n📍 Dossier :", getwd(), "\n")
 }, error = function(e) { cat("\n❌ Erreur d'enregistrement :", e$message, "\n") })
+
