@@ -1,4 +1,5 @@
 
+
 set.seed(1313)
 rm(list = ls())
 
@@ -559,35 +560,37 @@ tryCatch({
   cat("✔ Icilome : ", nrow(icilome_clean), " articles récupérés.\n")
 }, error = function(e) { cat("❌ Échec Icilome : ", e$message, "\n") })
 
-# ==============================================================================
-# 12. RÉPUBLIQUE TOGOLAISE (FR)
-# ==============================================================================
-republicoftogo_web_url <- "https://www.republicoftogo.com/"
-tryCatch({
-  republicoftogo_page <- read_html(republicoftogo_web_url)
-  republicoftogo_anchors <- html_nodes(republicoftogo_page, "a:has(h2)")
-  
-  republicoftogo_titles <- vapply(republicoftogo_anchors, function(a) {
-    h <- html_node(a, "h2")
-    if (is.na(h)) NA_character_ else html_text(h, trim = TRUE)
-  }, FUN.VALUE = character(1))
-  republicoftogo_links <- html_attr(republicoftogo_anchors, "href")
-  
-  valides <- !is.na(republicoftogo_titles) & republicoftogo_titles != "" & !is.na(republicoftogo_links)
-  republicoftogo_titles <- republicoftogo_titles[valides]
-  republicoftogo_links  <- republicoftogo_links[valides]
-  republicoftogo_links  <- ifelse(startsWith(republicoftogo_links, "http"),
-                                  republicoftogo_links, paste0("https://www.republicoftogo.com", republicoftogo_links))
-  
-  republicoftogo_clean <- unique(data.frame(
-    Source = "République Togolaise (FR)", Language = "FR", Date = date_aujourdhui,
-    Title = republicoftogo_titles, URL = republicoftogo_links, stringsAsFactors = FALSE
-  ))
-  tous_les_articles <- rbind(tous_les_articles, republicoftogo_clean)
-  cat("✔ République Togolaise : ", nrow(republicoftogo_clean), " articles récupérés.\n")
-}, error = function(e) { cat("❌ Échec République Togolaise : ", e$message, "\n") })
 
-# ==============================================================================
+# # ==============================================================================
+# # 12. RÉPUBLIQUE TOGOLAISE (FR)
+# # ==============================================================================
+# republicoftogo_web_url <- "https://www.republicoftogo.com/"
+# tryCatch({
+#   republicoftogo_page <- read_html(republicoftogo_web_url)
+#   republicoftogo_anchors <- html_nodes(republicoftogo_page, "a:has(h2)")
+#   
+#   republicoftogo_titles <- vapply(republicoftogo_anchors, function(a) {
+#     h <- html_node(a, "h2")
+#     if (is.na(h)) NA_character_ else html_text(h, trim = TRUE)
+#   }, FUN.VALUE = character(1))
+#   republicoftogo_links <- html_attr(republicoftogo_anchors, "href")
+#   
+#   valides <- !is.na(republicoftogo_titles) & republicoftogo_titles != "" & !is.na(republicoftogo_links)
+#   republicoftogo_titles <- republicoftogo_titles[valides]
+#   republicoftogo_links  <- republicoftogo_links[valides]
+#   republicoftogo_links  <- ifelse(startsWith(republicoftogo_links, "http"),
+#                                   republicoftogo_links, paste0("https://www.republicoftogo.com", republicoftogo_links))
+#   
+#   republicoftogo_clean <- unique(data.frame(
+#     Source = "République Togolaise (FR)", Language = "FR", Date = date_aujourdhui,
+#     Title = republicoftogo_titles, URL = republicoftogo_links, stringsAsFactors = FALSE
+#   ))
+#   tous_les_articles <- rbind(tous_les_articles, republicoftogo_clean)
+#   cat("✔ République Togolaise : ", nrow(republicoftogo_clean), " articles récupérés.\n")
+# }, error = function(e) { cat("❌ Échec République Togolaise : ", e$message, "\n") })
+# 
+# 
+#==============================================================================
 # 13. TOGO FIRST (FR)
 # ==============================================================================
 togofirst_web_url <- "https://www.togofirst.com/fr"
@@ -621,29 +624,107 @@ tryCatch({
 
 
 # ==============================================================================
-# 14. L'ALTERNATIVE (FR)
+# L'Alternative (Scraping HTML Togo)
 # ==============================================================================
-lalternative_web_url <- "https://lalternative.info/"
 tryCatch({
-  lalternative_page <- read_html(lalternative_web_url)
-  lalternative_anchors <- html_nodes(lalternative_page, "h3 a")
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
   
-  lalternative_titles <- html_text(lalternative_anchors, trim = TRUE)
-  lalternative_links  <- html_attr(lalternative_anchors, "href")
+  alternative_url <- "https://lalternative.info"
+  alternative_page <- read_html(alternative_url)
+  alternative_nodes <- html_nodes(alternative_page, "a")
   
-  valides <- !is.na(lalternative_titles) & lalternative_titles != "" & !is.na(lalternative_links)
-  lalternative_titles <- lalternative_titles[valides]
-  lalternative_links  <- lalternative_links[valides]
-  lalternative_links  <- ifelse(startsWith(lalternative_links, "http"),
-                                lalternative_links, paste0("https://lalternative.info", lalternative_links))
+  alternative_df <- data.frame(
+    Source = "L'Alternative (TG)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(alternative_nodes, trim = TRUE),
+    URL = html_attr(alternative_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
   
-  lalternative_clean <- unique(data.frame(
-    Source = "L'Alternative (FR)", Language = "FR", Date = date_aujourdhui,
-    Title = lalternative_titles, URL = lalternative_links, stringsAsFactors = FALSE
-  ))
-  tous_les_articles <- rbind(tous_les_articles, lalternative_clean)
-  cat("✔ L'Alternative : ", nrow(lalternative_clean), " articles récupérés.\n")
+  # Nettoyage de base pour exclure les menus statiques
+  alt_clean <- alternative_df[!is.na(alternative_df$URL) & alternative_df$Title != "", ]
+  # Exclure la page d'accueil simple, la recherche et les catégories génériques
+  alt_clean <- alt_clean[!alt_clean$URL %in% c(alternative_url, "https://lalternative.info"), ]
+  alt_clean <- alt_clean[!grepl("/category/|/contact|/a-propos", alt_clean$URL), ]
+  alt_clean <- unique(alt_clean)
+  
+  if (nrow(alt_clean) > 0) {
+    tous_les_articles <- rbind(tous_les_articles, alt_clean)
+    cat("✔ L'Alternative : ", nrow(alt_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ L'Alternative : Aucun contenu extrait.\n")
+  }
 }, error = function(e) { cat("❌ Échec L'Alternative : ", e$message, "\n") })
+
+
+# ==============================================================================
+# Laabali (Scraping HTML Togo)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  laabali_url <- "https://laabali.com"
+  laabali_page <- read_html(laabali_url)
+  laabali_nodes <- html_nodes(laabali_page, "a")
+  
+  laabali_df <- data.frame(
+    Source = "Laabali (TG)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(laabali_nodes, trim = TRUE),
+    URL = html_attr(laabali_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  laabali_clean <- laabali_df[!is.na(laabali_df$URL) & laabali_df$Title != "", ]
+  # Garder les articles en écartant la racine et les pages de fonctionnalités
+  laabali_clean <- laabali_clean[!laabali_clean$URL %in% c(laabali_url, "https://laabali.com"), ]
+  laabali_clean <- laabali_clean[!grepl("/page/|/author/|/category/", laabali_clean$URL), ]
+  laabali_clean <- unique(laabali_clean)
+  
+  if (nrow(laabali_clean) > 0) {
+    tous_les_articles <- rbind(tous_les_articles, laabali_clean)
+    cat("✔ Laabali : ", nrow(laabali_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ Laabali : Aucun contenu extrait.\n")
+  }
+}, error = function(e) { cat("❌ Échec Laabali : ", e$message, "\n") })
+
+
+
+# ==============================================================================
+# Journal Liberté (Scraping HTML Togo)
+# ==============================================================================
+tryCatch({
+  if (!exists("date_aujourdhui")) { date_aujourdhui <- as.character(Sys.Date()) }
+  
+  # Remplacez par l'URL active du journal ou de son agrégateur dédié si elle change
+  liberte_url <- "http://journal-liberte.tg" 
+  
+  liberte_page <- read_html(liberte_url)
+  liberte_nodes <- html_nodes(liberte_page, "a")
+  
+  liberte_df <- data.frame(
+    Source = "Liberté Togo (TG)",
+    Language = "FR",
+    Date = date_aujourdhui,
+    Title = html_text(liberte_nodes, trim = TRUE),
+    URL = html_attr(liberte_nodes, "href"),
+    stringsAsFactors = FALSE
+  )
+  
+  liberte_clean <- liberte_df[!is.na(liberte_df$URL) & liberte_df$Title != "", ]
+  liberte_clean <- liberte_clean[!liberte_clean$URL %in% c(liberte_url, "http://journal-liberte.tg"), ]
+  liberte_clean <- unique(liberte_clean)
+  
+  if (nrow(liberte_clean) > 0) {
+    tous_les_articles <- rbind(tous_les_articles, liberte_clean)
+    cat("✔ Liberté Togo : ", nrow(liberte_clean), " articles récupérés.\n")
+  } else {
+    cat("⚠ Liberté Togo : Site inaccessible ou vide actuellement.\n")
+  }
+}, error = function(e) { cat("⚠ Note Liberté Togo : Site hors-ligne ou structure modifiée (", e$message, ")\n") })
 
 # ==============================================================================
 #  d'autre ajouts
@@ -740,6 +821,8 @@ print(head(tous_les_articles, 20))
 table(tous_les_articles$Source)
 
 
+
+
 # ==============================================================================
 # TRAITEMENT FINAL ET EXPORTATION
 # ==============================================================================
@@ -756,4 +839,3 @@ tryCatch({
   write.csv2(tous_les_articles, file = nom_fichier, row.names = FALSE, fileEncoding = "UTF-8")
   cat("\n💾 Fichier enregistré sous :", nom_fichier, "\n📍 Dossier :", getwd(), "\n")
 }, error = function(e) { cat("\n❌ Erreur d'enregistrement :", e$message, "\n") })
-
